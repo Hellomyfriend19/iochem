@@ -9,22 +9,376 @@ interface PeriodicTableWithSandboxProps {
   currentLang: Language;
 }
 
+interface ParsedFormula {
+  raw: string;
+  isElement: boolean;
+  isMetal: boolean;
+  isNonmetal: boolean;
+  isOxide: boolean;
+  isBasicOxide: boolean;
+  isAcidicOxide: boolean;
+  isAcid: boolean;
+  isBase: boolean;
+  isSalt: boolean;
+  isOrganic: boolean;
+  isWater: boolean;
+  cation: string;
+  anion: string;
+  metalElement: string;
+  nonmetalElement: string;
+}
+
+const parseFormula = (f: string): ParsedFormula => {
+  const raw = f.trim();
+  const res: ParsedFormula = {
+    raw,
+    isElement: false,
+    isMetal: false,
+    isNonmetal: false,
+    isOxide: false,
+    isBasicOxide: false,
+    isAcidicOxide: false,
+    isAcid: false,
+    isBase: false,
+    isSalt: false,
+    isOrganic: false,
+    isWater: raw === 'H2O',
+    cation: '',
+    anion: '',
+    metalElement: '',
+    nonmetalElement: ''
+  };
+
+  if (res.isWater) return res;
+
+  // 1. Organic check (contains both C and H, and maybe O, and starts with C)
+  if (raw.startsWith('C') && /[A-Za-z0-9]/.test(raw) && raw.includes('H') && !raw.includes('CO3')) {
+    res.isOrganic = true;
+    return res;
+  }
+
+  // List of known active metals and transition metals
+  const metals = ['Na', 'K', 'Ca', 'Mg', 'Fe', 'Zn', 'Cu', 'Al'];
+  const nonmetals = ['H', 'O', 'Cl', 'S', 'C', 'P', 'N', 'H2', 'O2', 'Cl2'];
+
+  // Check if pure elements
+  if (metals.includes(raw)) {
+    res.isElement = true;
+    res.isMetal = true;
+    res.metalElement = raw;
+    return res;
+  }
+  if (nonmetals.includes(raw)) {
+    res.isElement = true;
+    res.isNonmetal = true;
+    res.nonmetalElement = raw.replace(/\d+/g, ''); // get core element
+    return res;
+  }
+
+  // 2. Bases check: starts with a metal, ends with OH or (OH)x
+  const baseMatch = raw.match(/^([A-Z][a-z]?)\(?(OH)\)?(\d+)?$/);
+  if (baseMatch && metals.includes(baseMatch[1])) {
+    res.isBase = true;
+    res.cation = baseMatch[1];
+    res.anion = 'OH';
+    return res;
+  }
+
+  // 3. Acids check: starts with H followed by an anion (except H2O, H2, H2S is acid)
+  // Let's check common acids: HCl, H2SO4, HNO3, H2CO3, H2S, H2SO3, H3PO4
+  const acidMatch = raw.match(/^H(\d+)?(Cl|SO4|NO3|CO3|S|SO3|PO4)$/);
+  if (acidMatch) {
+    res.isAcid = true;
+    res.cation = 'H';
+    res.anion = acidMatch[2];
+    return res;
+  }
+
+  // 4. Oxides check: Compound of metal/nonmetal + O
+  // Basic Oxides: metal + O (e.g. Na2O, CaO, MgO, Fe2O3, CuO, ZnO, Al2O3)
+  // Acidic Oxides: nonmetal + O (e.g. CO2, SO2, SO3, P2O5)
+  const oxideMatch = raw.match(/^([A-Z][a-z]?)(\d+)?O(\d+)?$/);
+  if (oxideMatch) {
+    const element = oxideMatch[1];
+    if (metals.includes(element)) {
+      res.isOxide = true;
+      res.isBasicOxide = true;
+      res.cation = element;
+      return res;
+    } else if (['C', 'S', 'P', 'N'].includes(element)) {
+      res.isOxide = true;
+      res.isAcidicOxide = true;
+      res.nonmetalElement = element;
+      return res;
+    }
+  }
+
+  // 5. Salts check: starts with a metal, ends with a known acid anion
+  for (const m of metals) {
+    if (raw.startsWith(m)) {
+      const rest = raw.substring(m.length).replace(/\d+/g, '').replace(/[()]/g, '');
+      const validAnions = ['Cl', 'SO4', 'NO3', 'CO3', 'S', 'SO3', 'PO4'];
+      if (validAnions.includes(rest)) {
+        res.isSalt = true;
+        res.cation = m;
+        res.anion = rest;
+        return res;
+      }
+    }
+  }
+
+  return res;
+};
+
+const getCationValency = (cat: string): number => {
+  if (['Na', 'K', 'H'].includes(cat)) return 1;
+  if (['Ca', 'Mg', 'Zn', 'Cu', 'Fe'].includes(cat)) return 2;
+  if (['Al'].includes(cat)) return 3;
+  return 1;
+};
+
+const getAnionValency = (an: string): number => {
+  if (['Cl', 'NO3', 'OH'].includes(an)) return 1;
+  if (['SO4', 'CO3', 'S', 'SO3'].includes(an)) return 2;
+  if (['PO4'].includes(an)) return 3;
+  return 1;
+};
+
+const simplifyRatio = (a: number, b: number): [number, number] => {
+  const gcd = (x: number, y: number): number => y === 0 ? x : gcd(y, x % y);
+  const divisor = gcd(a, b);
+  return [a / divisor, b / divisor];
+};
+
+const createSaltFormula = (cation: string, anion: string): string => {
+  const vc = getCationValency(cation);
+  const va = getAnionValency(anion);
+  const [numAnion, numCation] = simplifyRatio(vc, va);
+  
+  const catFormula = numCation === 1 ? cation : `${cation}${numCation}`;
+  const needsParens = numAnion > 1 && ['SO4', 'CO3', 'NO3', 'SO3', 'PO4'].includes(anion);
+  const anFormula = needsParens ? `(${anion})${numAnion}` : (numAnion === 1 ? anion : `${anion}${numAnion}`);
+  return `${catFormula}${anFormula}`;
+};
+
+const findProceduralReaction = (s1: string, s2: string) => {
+  const p1 = parseFormula(s1);
+  const p2 = parseFormula(s2);
+
+  const textEnglish = (r1: string, r2: string, products: string[], typeStr: string) => {
+    return `${r1} and ${r2} react to produce ${products.join(' + ')} (${typeStr}).`;
+  };
+
+  const buildReactionResponse = (products: string[], desc: string) => {
+    return {
+      reactants: [s1, s2],
+      products,
+      description: { en: desc, ka: desc, ru: desc }
+    };
+  };
+
+  const checkReactionPairs = (a: ParsedFormula, b: ParsedFormula) => {
+    // 1. Water + Acidic Oxide ➜ Acid
+    if (a.isWater && b.isAcidicOxide) {
+      if (b.nonmetalElement === 'C') {
+        return buildReactionResponse(
+          ['H2CO3'],
+          textEnglish(a.raw, b.raw, ['H2CO3'], 'Carbonic Acid Synthesis')
+        );
+      }
+      if (b.nonmetalElement === 'S') {
+        const product = b.raw.includes('3') ? 'H2SO4' : 'H2SO3';
+        const typeStr = product === 'H2SO4' ? 'Sulfuric Acid Synthesis' : 'Sulfurous Acid Synthesis';
+        return buildReactionResponse(
+          [product],
+          textEnglish(a.raw, b.raw, [product], typeStr)
+        );
+      }
+      if (b.nonmetalElement === 'P') {
+        return buildReactionResponse(
+          ['H3PO4'],
+          textEnglish(a.raw, b.raw, ['H3PO4'], 'Phosphoric Acid Synthesis')
+        );
+      }
+    }
+
+    // 2. Water + Basic Oxide ➜ Base
+    if (a.isWater && b.isBasicOxide) {
+      if (['Na', 'K', 'Ca'].includes(b.cation)) {
+        const baseFormula = b.cation === 'Ca' ? 'Ca(OH)2' : `${b.cation}OH`;
+        return buildReactionResponse(
+          [baseFormula],
+          textEnglish(a.raw, b.raw, [baseFormula], 'Hydroxide Base Synthesis')
+        );
+      }
+    }
+
+    // 3. Active Metal + Water ➜ Base + H2
+    if (a.isWater && b.isMetal && ['Na', 'K', 'Ca'].includes(b.metalElement)) {
+      const baseFormula = b.metalElement === 'Ca' ? 'Ca(OH)2' : `${b.metalElement}OH`;
+      return buildReactionResponse(
+        [baseFormula, 'H2'],
+        textEnglish(a.raw, b.raw, [baseFormula, 'H2'], 'Metal-Water Displacement')
+      );
+    }
+
+    // 4. Acid + Base ➜ Salt + H2O
+    if (a.isAcid && b.isBase) {
+      const salt = createSaltFormula(b.cation, a.anion);
+      return buildReactionResponse(
+        [salt, 'H2O'],
+        textEnglish(a.raw, b.raw, [salt, 'H2O'], 'Acid-Base Neutralization')
+      );
+    }
+
+    // 5. Acid + Basic Oxide ➜ Salt + H2O
+    if (a.isAcid && b.isBasicOxide) {
+      const salt = createSaltFormula(b.cation, a.anion);
+      return buildReactionResponse(
+        [salt, 'H2O'],
+        textEnglish(a.raw, b.raw, [salt, 'H2O'], 'Acid-Oxide Reaction')
+      );
+    }
+
+    // 6. Base + Acidic Oxide ➜ Salt + H2O
+    if (a.isBase && b.isAcidicOxide) {
+      let anion = 'CO3';
+      if (b.nonmetalElement === 'S') anion = b.raw.includes('3') ? 'SO4' : 'SO3';
+      if (b.nonmetalElement === 'P') anion = 'PO4';
+
+      const salt = createSaltFormula(a.cation, anion);
+      return buildReactionResponse(
+        [salt, 'H2O'],
+        textEnglish(a.raw, b.raw, [salt, 'H2O'], 'Base-Oxide Carbonation')
+      );
+    }
+
+    // 7. Basic Oxide + Acidic Oxide ➜ Salt
+    if (a.isBasicOxide && b.isAcidicOxide) {
+      let anion = 'CO3';
+      if (b.nonmetalElement === 'S') anion = b.raw.includes('3') ? 'SO4' : 'SO3';
+      if (b.nonmetalElement === 'P') anion = 'PO4';
+
+      const salt = createSaltFormula(a.cation, anion);
+      return buildReactionResponse(
+        [salt],
+        textEnglish(a.raw, b.raw, [salt], 'Direct Salt Synthesis')
+      );
+    }
+
+    // 8. Metal + Acid ➜ Salt + H2
+    if (a.isMetal && b.isAcid) {
+      if (a.metalElement !== 'Cu') {
+        const salt = createSaltFormula(a.metalElement, b.anion);
+        return buildReactionResponse(
+          [salt, 'H2'],
+          textEnglish(a.raw, b.raw, [salt, 'H2'], 'Single Displacement')
+        );
+      }
+    }
+
+    // 9. Combustion / Oxidation of Elements/Organics
+    const isOx = (pStr: ParsedFormula) => pStr.isNonmetal && pStr.nonmetalElement === 'O';
+    if (isOx(a) || isOx(b)) {
+      const other = isOx(a) ? b : a;
+
+      if (other.isMetal) {
+        let oxide = 'Na2O';
+        if (other.metalElement === 'Na') oxide = 'Na2O';
+        else if (other.metalElement === 'K') oxide = 'K2O';
+        else if (other.metalElement === 'Ca') oxide = 'CaO';
+        else if (other.metalElement === 'Mg') oxide = 'MgO';
+        else if (other.metalElement === 'Al') oxide = 'Al2O3';
+        else if (other.metalElement === 'Fe') oxide = 'Fe2O3';
+        else if (other.metalElement === 'Zn') oxide = 'ZnO';
+        else if (other.metalElement === 'Cu') oxide = 'CuO';
+
+        return buildReactionResponse(
+          [oxide],
+          textEnglish(a.raw, b.raw, [oxide], 'Metal Combustion')
+        );
+      }
+
+      if (other.isNonmetal) {
+        if (other.nonmetalElement === 'C') {
+          return buildReactionResponse(
+            ['CO2'],
+            textEnglish(a.raw, b.raw, ['CO2'], 'Carbon Combustion')
+          );
+        }
+        if (other.nonmetalElement === 'S') {
+          return buildReactionResponse(
+            ['SO2'],
+            textEnglish(a.raw, b.raw, ['SO2'], 'Sulfur Combustion')
+          );
+        }
+        if (other.nonmetalElement === 'H') {
+          return buildReactionResponse(
+            ['H2O'],
+            textEnglish(a.raw, b.raw, ['H2O'], 'Hydrogen Synthesis')
+          );
+        }
+      }
+
+      if (other.isOrganic) {
+        return buildReactionResponse(
+          ['CO2', 'H2O'],
+          textEnglish(a.raw, b.raw, ['CO2', 'H2O'], 'Hydrocarbon Combustion')
+        );
+      }
+    }
+
+    // 10. Acid + Carbonate/Sulfide Salt
+    if (a.isAcid && b.isSalt) {
+      if (b.anion === 'CO3') {
+        const salt = createSaltFormula(b.cation, a.anion);
+        return buildReactionResponse(
+          [salt, 'H2O', 'CO2'],
+          textEnglish(a.raw, b.raw, [salt, 'H2O', 'CO2'], 'Carbonate Acidolysis')
+        );
+      }
+      if (b.anion === 'S') {
+        const salt = createSaltFormula(b.cation, a.anion);
+        return buildReactionResponse(
+          [salt, 'H2S'],
+          textEnglish(a.raw, b.raw, [salt, 'H2S'], 'Sulfide Acidolysis')
+        );
+      }
+    }
+
+    return null;
+  };
+
+  const rx1 = checkReactionPairs(p1, p2);
+  if (rx1) return rx1;
+  const rx2 = checkReactionPairs(p2, p1);
+  if (rx2) return rx2;
+
+  return null;
+};
+
 const findReactionForSymbols = (s1: string, s2: string) => {
   const sym1 = s1.trim();
   const sym2 = s2.trim();
   
-  // 1. Direct match in physicsReactions
+  // 1. Procedural Smart Match
+  const proc = findProceduralReaction(sym1, sym2);
+  if (proc) return proc;
+
+  // 2. Direct match in physicsReactions
   const found = physicsReactions.find(r => 
     (r.reactants[0] === sym1 && r.reactants[1] === sym2) ||
     (r.reactants[0] === sym2 && r.reactants[1] === sym1)
   );
   if (found) return found;
 
-  // 2. Add atomic elements matchups
+  // 3. Add atomic elements matchups
   const sortedPair = [sym1, sym2].sort().join('+');
   
   const elementReactions: Record<string, { products: string[], desc: string }> = {
     'H+O': { products: ['H2O'], desc: 'Hydrogen and Oxygen react to form Water.' },
+    'C+O': { products: ['CO2'], desc: 'Carbon and Oxygen react to form Carbon Dioxide.' },
+    'C+O2': { products: ['CO2'], desc: 'Carbon and Oxygen gas react to form Carbon Dioxide.' },
     'Cl+Na': { products: ['NaCl'], desc: 'Sodium and Chlorine react to form Sodium Chloride (Salt).' },
     'Cl+H': { products: ['HCl'], desc: 'Hydrogen and Chlorine react to form Hydrochloric Acid.' },
     'Cl+K': { products: ['KCl'], desc: 'Potassium and Chlorine react to form Potassium Chloride.' },
@@ -111,6 +465,82 @@ export default function PeriodicTableWithSandbox({ currentLang }: PeriodicTableW
   const dragOffset = useRef({ x: 0, y: 0 });
   const reactingIdsRef = useRef<Set<string>>(new Set());
 
+  // Custom compound formula adding states and methods
+  const [customFormula, setCustomFormula] = useState('');
+  const [customError, setCustomError] = useState('');
+
+  const calculateFormulaMass = (formula: string): number => {
+    const elementMasses: Record<string, number> = {
+      H: 1.008, He: 4.002, Li: 6.94, Be: 9.012, B: 10.81, C: 12.011, N: 14.007, O: 15.999,
+      F: 18.998, Ne: 20.18, Na: 22.99, Mg: 24.305, Al: 26.982, Si: 28.085, P: 30.974,
+      S: 32.06, Cl: 35.45, Ar: 39.948, K: 39.098, Ca: 40.078, Sc: 44.956, Ti: 47.867,
+      V: 50.942, Cr: 51.996, Mn: 54.938, Fe: 55.845, Co: 58.933, Ni: 58.693, Cu: 63.546,
+      Zn: 65.38, Ga: 69.723, Ge: 72.63, As: 74.922, Se: 78.971, Br: 79.904, Kr: 83.798
+    };
+    const matches = formula.match(/([A-Z][a-z]?)(\d+)?/g) || [];
+    let total = 0;
+    for (const m of matches) {
+      const elMatch = m.match(/([A-Z][a-z]?)(\d+)?/);
+      if (elMatch) {
+        const el = elMatch[1];
+        const count = elMatch[2] ? parseInt(elMatch[2], 10) : 1;
+        const mass = elementMasses[el] || 20;
+        total += mass * count;
+      }
+    }
+    if (formula.includes('(OH)2')) total += 17;
+    if (formula.includes('(OH)3')) total += 34;
+    if (formula.includes('(SO4)3')) total += 192;
+    if (formula.includes('(CO3)3')) total += 120;
+    return Math.round(total * 10) / 10 || 40;
+  };
+
+  const getCompoundColor = (formula: string): string => {
+    const p = parseFormula(formula);
+    if (p.isWater) return '#38BDF8';
+    if (p.isBase) return '#AF52DE';
+    if (p.isAcid) return '#FF3B30';
+    if (p.isOxide) return '#FF9500';
+    if (p.isSalt) return '#34C759';
+    if (p.isOrganic) return '#10B981';
+    return '#0071E3';
+  };
+
+  const spawnCompound = (formula: string) => {
+    if (!sandboxRef.current) return;
+    const rect = sandboxRef.current.getBoundingClientRect();
+    const radius = 28;
+
+    const newTile: SandboxTile = {
+      id: Math.random().toString(36).substring(2, 9),
+      symbol: formula,
+      x: rect.width / 2 + (Math.random() * 80 - 40),
+      y: rect.height / 2 + (Math.random() * 80 - 40),
+      vx: 0,
+      vy: 0,
+      radius,
+      color: getCompoundColor(formula),
+      mass: calculateFormulaMass(formula)
+    };
+
+    setTiles((prev) => [...prev, newTile]);
+  };
+
+  const handleAddCustom = () => {
+    const formula = customFormula.trim();
+    if (!formula) return;
+    
+    // Quick validation
+    if (!/^[A-Z][A-Za-z0-9()]*$/.test(formula)) {
+      setCustomError("Enter a valid formula (e.g. NaOH, HCl)");
+      setTimeout(() => setCustomError(''), 4000);
+      return;
+    }
+
+    spawnCompound(formula);
+    setCustomFormula('');
+  };
+
   // Add element to Sandbox Onboarding Drag/Click
   const addElementToSandbox = (elem: PeriodicElement) => {
     if (!sandboxRef.current) return;
@@ -159,8 +589,8 @@ export default function PeriodicTableWithSandbox({ currentLang }: PeriodicTableW
         vx: 0,
         vy: 0,
         radius: 28,
-        color: '#10B981',
-        mass: 40
+        color: getCompoundColor(prodSymbol),
+        mass: calculateFormulaMass(prodSymbol)
       };
     });
 
@@ -297,9 +727,41 @@ export default function PeriodicTableWithSandbox({ currentLang }: PeriodicTableW
 
   // Helper: check list of possible suggested reaction partners for selected tile
   const getSuggestionsForTile = (symbol: string): string[] => {
+    const p = parseFormula(symbol);
+    const setOfPartners = new Set<string>();
+
     const matchedReactions = physicsReactions.filter(r => r.reactants.includes(symbol));
-    const partners = matchedReactions.map(r => r.reactants.find(rect => rect !== symbol) || '');
-    return Array.from(new Set(partners)).filter(p => p !== '');
+    matchedReactions.forEach(r => {
+      const partner = r.reactants.find(rect => rect !== symbol);
+      if (partner) setOfPartners.add(partner);
+    });
+
+    // Add procedural ones dynamically!
+    if (p.isWater) {
+      ['CO2', 'SO2', 'Na2O', 'K2O', 'CaO', 'Na', 'K', 'Ca'].forEach(s => setOfPartners.add(s));
+    } else if (p.isAcidicOxide) {
+      ['H2O', 'NaOH', 'KOH', 'Ca(OH)2', 'Na2O', 'CaO'].forEach(s => setOfPartners.add(s));
+    } else if (p.isBasicOxide) {
+      ['H2O', 'HCl', 'H2SO4', 'CO2', 'SO2'].forEach(s => setOfPartners.add(s));
+    } else if (p.isAcid) {
+      ['NaOH', 'KOH', 'Ca(OH)2', 'Na2O', 'CaO', 'Na', 'Zn', 'Fe', 'CaCO3', 'Na2CO3'].forEach(s => setOfPartners.add(s));
+    } else if (p.isBase) {
+      ['HCl', 'H2SO4', 'HNO3', 'CO2', 'SO2', 'SO3'].forEach(s => setOfPartners.add(s));
+    } else if (p.isElement && p.nonmetalElement === 'O') {
+      ['Na', 'Ca', 'Mg', 'Fe', 'Al', 'C', 'S', 'CH4', 'C2H5OH', 'CH3COOH'].forEach(s => setOfPartners.add(s));
+    } else if (p.isOrganic) {
+      ['O2', 'O'].forEach(s => setOfPartners.add(s));
+    } else if (p.isMetal) {
+      if (symbol !== 'Cu') {
+        ['HCl', 'H2SO4', 'O2', 'O'].forEach(s => setOfPartners.add(s));
+      } else {
+        ['O2', 'O'].forEach(s => setOfPartners.add(s));
+      }
+    } else if (p.isSalt && p.anion === 'CO3') {
+      ['HCl', 'H2SO4', 'HNO3'].forEach(s => setOfPartners.add(s));
+    }
+
+    return Array.from(setOfPartners).filter(pStr => pStr !== symbol);
   };
 
   // Handle clicking a suggestion button to generate and collide in reactions
@@ -309,9 +771,12 @@ export default function PeriodicTableWithSandbox({ currentLang }: PeriodicTableW
     if (!currentTile) return;
 
     // Search reactants library
-    const reaction = physicsReactions.find(r =>
-      r.reactants.includes(currentTile.symbol) && r.reactants.includes(partnerSymbol)
-    );
+    let reaction = findProceduralReaction(currentTile.symbol, partnerSymbol);
+    if (!reaction) {
+      reaction = physicsReactions.find(r =>
+        r.reactants.includes(currentTile.symbol) && r.reactants.includes(partnerSymbol)
+      );
+    }
 
     if (!reaction) return;
 
@@ -325,8 +790,8 @@ export default function PeriodicTableWithSandbox({ currentLang }: PeriodicTableW
         vx: 0,
         vy: 0,
         radius: 28,
-        color: '#10B981', // green colored success product
-        mass: 40
+        color: getCompoundColor(prodSymbol),
+        mass: calculateFormulaMass(prodSymbol)
       };
     });
 
@@ -449,6 +914,141 @@ export default function PeriodicTableWithSandbox({ currentLang }: PeriodicTableW
               <Trash2 size={14} />
               {t.cleanBtn}
             </button>
+          </div>
+
+          {/* Dynamic Compounds Creator & Custom Spawner Dashboard Panel */}
+          <div className="bg-white border border-[#E5E5EA] rounded-3xl p-5 space-y-4 shadow-sm">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="space-y-0.5">
+                <span className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                  🧪 Spawner & Compounds Lab
+                </span>
+                <p className="text-[11px] text-gray-500">
+                  Select predefined chemicals or type any custom formula to drop its active tile.
+                </p>
+              </div>
+              
+              {/* Add Custom Formula input with live validation */}
+              <div className="w-full md:w-auto space-y-1">
+                <div className="flex items-center gap-1.5 w-full md:w-auto">
+                  <input
+                    type="text"
+                    placeholder="e.g. NaOH, HCl, Na2O, CH3COOH..."
+                    className="px-3.5 py-2 text-xs rounded-xl border border-[#E5E5EA] bg-[#F5F5F7] text-gray-900 focus:outline-[#0071E3] font-mono tracking-wide w-full md:w-56 placeholder:font-sans placeholder:tracking-normal"
+                    value={customFormula}
+                    onChange={(e) => setCustomFormula(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleAddCustom();
+                    }}
+                  />
+                  <button
+                    id="add-custom-compound-btn"
+                    onClick={handleAddCustom}
+                    className="px-4 py-2 rounded-xl bg-[#0071E3] hover:bg-blue-600 font-semibold text-xs text-white shadow-sm transition-all whitespace-nowrap cursor-pointer"
+                  >
+                    Add Custom
+                  </button>
+                </div>
+                {customError && (
+                  <p className="text-[10px] text-red-500 font-medium pl-1 animate-pulse">
+                    ⚠️ {customError}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Quick Categories grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 pt-2">
+              {/* BASES */}
+              <div className="space-y-2 bg-[#F5F5F7]/40 p-2.5 rounded-2xl border border-[#E5E5EA]">
+                <div className="text-[9px] font-bold text-gray-500 uppercase tracking-widest pl-0.5">
+                  🧬 Bases
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {['NaOH', 'KOH', 'Ca(OH)2', 'Fe(OH)3'].map(c => (
+                    <button
+                      key={c}
+                      onClick={() => spawnCompound(c)}
+                      className="px-2 py-1 text-[10px] font-bold font-mono bg-white border border-gray-200 rounded-lg text-purple-700 hover:bg-[#0071E3] hover:text-white hover:border-[#0071E3] transition-all cursor-pointer"
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* OXIDES */}
+              <div className="space-y-2 bg-[#F5F5F7]/40 p-2.5 rounded-2xl border border-[#E5E5EA]">
+                <div className="text-[9px] font-bold text-gray-500 uppercase tracking-widest pl-0.5">
+                  🌋 Oxides
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {['CO2', 'Na2O', 'Fe2O3', 'CaO', 'SO2'].map(c => (
+                    <button
+                      key={c}
+                      onClick={() => spawnCompound(c)}
+                      className="px-2 py-1 text-[10px] font-bold font-mono bg-white border border-gray-200 rounded-lg text-amber-700 hover:bg-[#0071E3] hover:text-white hover:border-[#0071E3] transition-all cursor-pointer"
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* ACIDS */}
+              <div className="space-y-2 bg-[#F5F5F7]/40 p-2.5 rounded-2xl border border-[#E5E5EA]">
+                <div className="text-[9px] font-bold text-gray-500 uppercase tracking-widest pl-0.5">
+                  🔥 Acids
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {['HCl', 'H2SO4', 'H2CO3', 'HNO3'].map(c => (
+                    <button
+                      key={c}
+                      onClick={() => spawnCompound(c)}
+                      className="px-2 py-1 text-[10px] font-bold font-mono bg-white border border-gray-200 rounded-lg text-red-600 hover:bg-[#0071E3] hover:text-white hover:border-[#0071E3] transition-all cursor-pointer"
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* SALTS */}
+              <div className="space-y-2 bg-[#F5F5F7]/40 p-2.5 rounded-2xl border border-[#E5E5EA]">
+                <div className="text-[9px] font-bold text-gray-500 uppercase tracking-widest pl-0.5">
+                  🧂 Salts
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {['NaCl', 'CaCl2', 'MgSO4', 'CaCO3'].map(c => (
+                    <button
+                      key={c}
+                      onClick={() => spawnCompound(c)}
+                      className="px-2 py-1 text-[10px] font-bold font-mono bg-white border border-gray-200 rounded-lg text-green-700 hover:bg-[#0071E3] hover:text-white hover:border-[#0071E3] transition-all cursor-pointer"
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* ORGANIC */}
+              <div className="space-y-2 bg-[#F5F5F7]/40 p-2.5 rounded-2xl border border-[#E5E5EA]">
+                <div className="text-[9px] font-bold text-gray-500 uppercase tracking-widest pl-0.5">
+                  🌿 Organics
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {['CH4', 'C2H5OH', 'CH3COOH', 'C6H12O6'].map(c => (
+                    <button
+                      key={c}
+                      onClick={() => spawnCompound(c)}
+                      className="px-2 py-1 text-[10px] font-bold font-mono bg-white border border-gray-200 rounded-lg text-emerald-700 hover:bg-[#0071E3] hover:text-white hover:border-[#0071E3] transition-all cursor-pointer"
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Physics Canvas Area wrapper */}

@@ -7,9 +7,10 @@ import { translations } from '../data/translationData';
 interface LanguageSelectorProps {
   currentLang: Language;
   onLanguageChange: (lang: Language) => void;
+  isPortrait?: boolean;
 }
 
-export default function LanguageSelector({ currentLang, onLanguageChange }: LanguageSelectorProps) {
+export default function LanguageSelector({ currentLang, onLanguageChange, isPortrait }: LanguageSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const languages: Array<{ code: Language; label: string; flag: string }> = [
@@ -23,43 +24,45 @@ export default function LanguageSelector({ currentLang, onLanguageChange }: Lang
   return (
     <div className="flex items-center gap-4 relative z-50">
       {/* Inline Language Selector segment pill */}
-      <div className="flex items-center gap-2 px-3.5 py-1.5 bg-[#F5F5F7] rounded-xl text-xs font-medium border border-[#E5E5EA] shadow-xs">
-        <button
-          id="lang-toggle-en"
-          onClick={() => onLanguageChange('en')}
-          className={`cursor-pointer transition-all duration-200 font-semibold uppercase ${
-            currentLang === 'en'
-              ? 'text-[#0071E3] font-bold scale-105'
-              : 'text-[#86868B] hover:text-[#1D1D1F]'
-          }`}
-        >
-          EN
-        </button>
-        <span className="text-[#E5E5EA] font-light">|</span>
-        <button
-          id="lang-toggle-ka"
-          onClick={() => onLanguageChange('ka')}
-          className={`cursor-pointer transition-all duration-200 font-semibold uppercase ${
-            currentLang === 'ka'
-              ? 'text-[#0071E3] font-bold scale-105'
-              : 'text-[#86868B] hover:text-[#1D1D1F]'
-          }`}
-        >
-          KA
-        </button>
-        <span className="text-[#E5E5EA] font-light">|</span>
-        <button
-          id="lang-toggle-ru"
-          onClick={() => onLanguageChange('ru')}
-          className={`cursor-pointer transition-all duration-200 font-semibold uppercase ${
-            currentLang === 'ru'
-              ? 'text-[#0071E3] font-bold scale-105'
-              : 'text-[#86868B] hover:text-[#1D1D1F]'
-          }`}
-        >
-          RU
-        </button>
-      </div>
+      {!isPortrait && (
+        <div className="flex items-center gap-2 px-3.5 py-1.5 bg-[#F5F5F7] rounded-xl text-xs font-medium border border-[#E5E5EA] shadow-xs">
+          <button
+            id="lang-toggle-en"
+            onClick={() => onLanguageChange('en')}
+            className={`cursor-pointer transition-all duration-200 font-semibold uppercase ${
+              currentLang === 'en'
+                ? 'text-[#0071E3] font-bold scale-105'
+                : 'text-[#86868B] hover:text-[#1D1D1F]'
+            }`}
+          >
+            EN
+          </button>
+          <span className="text-[#E5E5EA] font-light">|</span>
+          <button
+            id="lang-toggle-ka"
+            onClick={() => onLanguageChange('ka')}
+            className={`cursor-pointer transition-all duration-200 font-semibold uppercase ${
+              currentLang === 'ka'
+                ? 'text-[#0071E3] font-bold scale-105'
+                : 'text-[#86868B] hover:text-[#1D1D1F]'
+            }`}
+          >
+            KA
+          </button>
+          <span className="text-[#E5E5EA] font-light">|</span>
+          <button
+            id="lang-toggle-ru"
+            onClick={() => onLanguageChange('ru')}
+            className={`cursor-pointer transition-all duration-200 font-semibold uppercase ${
+              currentLang === 'ru'
+                ? 'text-[#0071E3] font-bold scale-105'
+                : 'text-[#86868B] hover:text-[#1D1D1F]'
+            }`}
+          >
+            RU
+          </button>
+        </div>
+      )}
 
       {/* Settings gear trigger icon */}
       <div className="relative">

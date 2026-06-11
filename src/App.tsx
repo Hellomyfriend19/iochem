@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Library, PlayCircle, Settings, Beaker, HelpCircle } from 'lucide-react';
 import { Language } from './types';
@@ -16,6 +16,16 @@ import FormulaCreator from './components/FormulaCreator';
 export default function App() {
   const [currentLang, setCurrentLang] = useState<Language>('en');
   const [activeSection, setActiveSection] = useState<'library' | 'playground'>('library');
+  const [isPortrait, setIsPortrait] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsPortrait(window.innerHeight > window.innerWidth);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Playground sub-tabs state
   const [activePlaygroundTab, setActivePlaygroundTab] = useState<'table' | 'completer' | 'characteristics' | 'creator'>('table');
@@ -38,14 +48,16 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           
           {/* Logo Brand Title */}
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[#1D1D1F] flex items-center justify-center text-white font-bold text-base shadow-xs">
-              I
+          {!isPortrait && (
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-[#1D1D1F] flex items-center justify-center text-white font-bold text-base shadow-xs">
+                I
+              </div>
+              <span className="font-display font-semibold text-lg tracking-tight text-[#1D1D1F]">
+                Iochem
+              </span>
             </div>
-            <span className="font-display font-semibold text-lg tracking-tight text-[#1D1D1F]">
-              Iochem
-            </span>
-          </div>
+          )}
 
           {/* Center Apple-style Section Switchers Tab */}
           <nav className="flex bg-[#F5F5F7] p-1 rounded-full border border-[#E5E5EA]">
@@ -84,6 +96,7 @@ export default function App() {
           <LanguageSelector
             currentLang={currentLang}
             onLanguageChange={(lang) => setCurrentLang(lang)}
+            isPortrait={isPortrait}
           />
 
         </div>

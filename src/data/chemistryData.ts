@@ -1172,7 +1172,7 @@ export function checkValencyFormula(elemSymbol: string, count1: number, partnerS
   // valency database
   const valencies: Record<string, number> = {
     'H': 1, 'O': 2, 'Na': 1, 'K': 1, 'Li': 1, 'Ca': 2, 'Mg': 2, 'Al': 3,
-    'Fe': 3, 'Cu': 2, 'Zn': 2, 'Cl': 1, 'S': 2, 'N': 3, 'P': 5
+    'Fe': 3, 'Cu': 2, 'Zn': 2, 'Cl': 1, 'S': 2, 'N': 3, 'P': 5, 'C': 4
   };
 
   const v1 = valencies[elemSymbol] || 2;

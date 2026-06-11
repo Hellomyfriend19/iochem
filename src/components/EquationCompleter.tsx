@@ -10,99 +10,204 @@ interface EquationCompleterProps {
 }
 
 function predictProducts(leftSide: string): { reactants: string; products: string } | null {
-  const cleanSide = leftSide.trim().toLowerCase();
-  
-  const hasNa = /na/.test(cleanSide);
-  const hasK = /\bk\b|\bk\d+/.test(cleanSide) || cleanSide.includes('k');
-  const hasCa = /ca/.test(cleanSide);
-  const hasMg = /mg/.test(cleanSide);
-  const hasAl = /al/.test(cleanSide);
-  const hasFe = /fe/.test(cleanSide);
-  const hasCu = /cu/.test(cleanSide);
-  const hasZn = /zn/.test(cleanSide);
-  
-  const hasCl = /cl/.test(cleanSide);
-  const hasO = /\bo\b|\bo\d+/.test(cleanSide) || cleanSide.includes('o2') || cleanSide.includes('o3') || (cleanSide.includes('o') && !cleanSide.includes('oh') && !cleanSide.includes('so4'));
-  const hasS = /\bs\b|\bs\d+/.test(cleanSide) || (cleanSide.includes('s') && !cleanSide.includes('so4') && !cleanSide.includes('fe') && !cleanSide.includes('as'));
-  const hasH = /h\d*/.test(cleanSide) && !cleanSide.includes('oh') && !cleanSide.includes('so4');
-  const hasC = /\bc\b|\bc\d+/.test(cleanSide) || (cleanSide.includes('c') && !cleanSide.includes('ca') && !cleanSide.includes('cl') && !cleanSide.includes('cu'));
-  
-  const hasSo4 = /so4/.test(cleanSide);
-  const hasOh = /oh/.test(cleanSide);
+  const normalizeFormula = (f: string): string => {
+    let s = f.trim();
+    // Remove coefficient if present (e.g. 2NaOH -> NaOH)
+    s = s.replace(/^\d+/, '').trim();
+    const upper = s.toUpperCase().replace(/\s+/g, '');
+    
+    // Precise chemical normalization map for predictable outcomes
+    if (upper === 'H2O' || upper === 'H2O1') return 'H2O';
+    if (upper === 'CO2') return 'CO2';
+    if (upper === 'SO2') return 'SO2';
+    if (upper === 'SO3') return 'SO3';
+    if (upper === 'P2O5') return 'P2O5';
+    if (upper === 'NAOH') return 'NaOH';
+    if (upper === 'KOH') return 'KOH';
+    if (['CA(OH)2', 'CA(OH)₂'].includes(upper)) return 'Ca(OH)2';
+    if (['FE(OH)3', 'FE(OH)₃'].includes(upper)) return 'Fe(OH)3';
+    if (upper === 'HCL') return 'HCl';
+    if (upper === 'H2SO4') return 'H2SO4';
+    if (upper === 'HNO3') return 'HNO3';
+    if (upper === 'H2CO3') return 'H2CO3';
+    if (upper === 'NA2O') return 'Na2O';
+    if (upper === 'K2O') return 'K2O';
+    if (upper === 'CAO') return 'CaO';
+    if (upper === 'MGO') return 'MgO';
+    if (upper === 'AL2O3') return 'Al2O3';
+    if (upper === 'FE2O3') return 'Fe2O3';
+    if (upper === 'ZNO') return 'ZnO';
+    if (upper === 'CUO') return 'CuO';
+    if (upper === 'NACL') return 'NaCl';
+    if (upper === 'KCL') return 'KCl';
+    if (upper === 'CACL2') return 'CaCl2';
+    if (upper === 'MGCL2') return 'MgCl2';
+    if (upper === 'FECL3') return 'FeCl3';
+    if (upper === 'CUCL2') return 'CuCl2';
+    if (upper === 'ZNCL2') return 'ZnCl2';
+    if (upper === 'ALCL3') return 'AlCl3';
+    if (upper === 'NA2S') return 'Na2S';
+    if (upper === 'FES') return 'FeS';
+    if (upper === 'CUS') return 'CuS';
+    if (upper === 'H2S') return 'H2S';
+    if (upper === 'ZNS') return 'ZnS';
+    if (upper === 'NA') return 'Na';
+    if (upper === 'K') return 'K';
+    if (upper === 'CA') return 'Ca';
+    if (upper === 'MG') return 'Mg';
+    if (upper === 'AL') return 'Al';
+    if (upper === 'FE') return 'Fe';
+    if (upper === 'ZN') return 'Zn';
+    if (upper === 'CU') return 'Cu';
+    if (upper === 'C') return 'C';
+    if (upper === 'S') return 'S';
+    if (upper === 'P') return 'P';
+    if (upper === 'O2') return 'O2';
+    if (upper === 'H2') return 'H2';
+    if (upper === 'CL2') return 'Cl2';
+    if (upper === 'CACO3') return 'CaCO3';
+    if (upper === 'NA2CO3') return 'Na2CO3';
+    if (upper === 'H2SO3') return 'H2SO3';
+    if (upper === 'H3PO4') return 'H3PO4';
+    if (upper === 'NA2SO4') return 'Na2SO4';
+    if (upper === 'K2SO4') return 'K2SO4';
+    if (upper === 'CASO4') return 'CaSO4';
+    if (upper === 'CO') return 'CO';
+    if (upper === 'CH4') return 'CH4';
+    if (upper === 'C2H5OH') return 'C2H5OH';
+    if (upper === 'CH3COOH') return 'CH3COOH';
+    if (upper === 'C6H12O6') return 'C6H12O6';
+    
+    return s;
+  };
 
-  // 1. NaOH/KOH/Ca(OH)2 + HCl/H2SO4
-  if (hasOh && hasCl) {
-    if (hasNa) return { reactants: 'NaOH + HCl', products: 'NaCl + H2O' };
-    if (hasK) return { reactants: 'KOH + HCl', products: 'KCl + H2O' };
-    if (hasCa) return { reactants: 'Ca(OH)2 + HCl', products: 'CaCl2 + H2O' };
-  }
-  if (hasOh && hasSo4) {
-    if (hasNa) return { reactants: 'NaOH + H2SO4', products: 'Na2SO4 + H2O' };
-  }
-  
-  // 2. Na/K/Ca + H2O
-  if (cleanSide.includes('h2o')) {
-    if (hasNa) return { reactants: 'Na + H2O', products: 'NaOH + H2' };
-    if (hasK) return { reactants: 'K + H2O', products: 'KOH + H2' };
-    if (hasCa) return { reactants: 'Ca + H2O', products: 'Ca(OH)2 + H2' };
+  const reactants = leftSide
+    .split('+')
+    .map(r => r.trim())
+    .filter(Boolean)
+    .map(normalizeFormula);
+
+  if (reactants.length === 0) return null;
+
+  // Single reactant decomposition reactions
+  if (reactants.length === 1) {
+    const single = reactants[0];
+    const decompMap: Record<string, string[]> = {
+      'H2O': ['H2', 'O2'],
+      'CaCO3': ['CaO', 'CO2'],
+      'H2CO3': ['H2O', 'CO2'],
+      'H2SO3': ['H2O', 'SO2'],
+    };
+    const prod = decompMap[single];
+    if (prod) {
+      return {
+        reactants: single,
+        products: prod.join(' + ')
+      };
+    }
+    return null;
   }
 
-  // 3. Acids (HCl/H2SO4) + Metals
-  if (hasCl && (cleanSide.includes('hcl') || cleanSide.includes('h'))) {
-    if (hasZn) return { reactants: 'Zn + HCl', products: 'ZnCl2 + H2' };
-    if (hasFe) return { reactants: 'Fe + HCl', products: 'FeCl2 + H2' };
-    if (hasMg) return { reactants: 'Mg + HCl', products: 'MgCl2 + H2' };
-    if (hasAl) return { reactants: 'Al + HCl', products: 'AlCl3 + H2' };
-    if (hasCa) return { reactants: 'Ca + HCl', products: 'CaCl2 + H2' };
-    if (hasNa) return { reactants: 'Na + HCl', products: 'NaCl + H2' };
-    if (hasK) return { reactants: 'K + HCl', products: 'KCl + H2' };
-  }
-  if (hasSo4 && (cleanSide.includes('h2so4') || cleanSide.includes('h'))) {
-    if (hasZn) return { reactants: 'Zn + H2SO4', products: 'ZnSO4 + H2' };
-    if (hasFe) return { reactants: 'Fe + H2SO4', products: 'FeSO4 + H2' };
-    if (hasMg) return { reactants: 'Mg + H2SO4', products: 'MgSO4 + H2' };
-    if (hasAl) return { reactants: 'Al + H2SO4', products: 'Al2(SO4)3 + H2' };
-  }
+  // Double reactants reactions
+  if (reactants.length === 2) {
+    const pair = [...reactants].sort().join('+');
+    
+    const reactionMap: Record<string, string[]> = {
+      // Elements + Oxygen
+      'Na+O2': ['Na2O'],
+      'K+O2': ['K2O'],
+      'Ca+O2': ['CaO'],
+      'Mg+O2': ['MgO'],
+      'Al+O2': ['Al2O3'],
+      'Fe+O2': ['Fe2O3'],
+      'Cu+O2': ['CuO'],
+      'O2+Zn': ['ZnO'],
+      'C+O2': ['CO2'],
+      'O2+S': ['SO2'],
+      'H2+O2': ['H2O'],
 
-  // 4. Oxides (Metals / Non-metals + O2)
-  if (hasO || cleanSide.includes('o2') || cleanSide.includes('o')) {
-    if (hasNa) return { reactants: 'Na + O2', products: 'Na2O' };
-    if (hasH) return { reactants: 'H2 + O2', products: 'H2O' };
-    if (hasFe) return { reactants: 'Fe + O2', products: 'Fe2O3' };
-    if (hasC) return { reactants: 'C + O2', products: 'CO2' };
-    if (hasS) return { reactants: 'S + O2', products: 'SO2' };
-    if (hasCu) return { reactants: 'Cu + O2', products: 'CuO' };
-    if (hasZn) return { reactants: 'Zn + O2', products: 'ZnO' };
-    if (hasCa) return { reactants: 'Ca + O2', products: 'CaO' };
-    if (hasMg) return { reactants: 'Mg + O2', products: 'MgO' };
-    if (hasAl) return { reactants: 'Al + O2', products: 'Al2O3' };
-    if (hasK) return { reactants: 'K + O2', products: 'K2O' };
-  }
+      // Organic + Oxygen (Combustion)
+      'CH4+O2': ['CO2', 'H2O'],
+      'C2H5OH+O2': ['CO2', 'H2O'],
+      'CH3COOH+O2': ['CO2', 'H2O'],
+      'C6H12O6+O2': ['CO2', 'H2O'],
 
-  // 5. Chlorides (Metals + Cl2)
-  if (hasCl || cleanSide.includes('cl2') || cleanSide.includes('cl')) {
-    if (hasNa) return { reactants: 'Na + Cl2', products: 'NaCl' };
-    if (hasK) return { reactants: 'K + Cl2', products: 'KCl' };
-    if (hasFe) return { reactants: 'Fe + Cl2', products: 'FeCl3' };
-    if (hasCu) return { reactants: 'Cu + Cl2', products: 'CuCl2' };
-    if (hasH) return { reactants: 'H2 + Cl2', products: 'HCl' };
-    if (hasAl) return { reactants: 'Al + Cl2', products: 'AlCl3' };
-    if (hasZn) return { reactants: 'Zn + Cl2', products: 'ZnCl2' };
-    if (hasCa) return { reactants: 'Ca + Cl2', products: 'CaCl2' };
-    if (hasMg) return { reactants: 'Mg + Cl2', products: 'MgCl2' };
-  }
+      // Elements + Chlorine
+      'Cl2+Na': ['NaCl'],
+      'Cl2+K': ['KCl'],
+      'Ca+Cl2': ['CaCl2'],
+      'Cl2+Mg': ['MgCl2'],
+      'Cl2+Fe': ['FeCl3'],
+      'Cl2+Cu': ['CuCl2'],
+      'Cl2+H2': ['HCl'],
+      'Cl2+Zn': ['ZnCl2'],
+      'Al+Cl2': ['AlCl3'],
 
-  // 6. Sulfides (Metals + S)
-  if (hasS || cleanSide.includes('s')) {
-    if (hasNa) return { reactants: 'Na + S', products: 'Na2S' };
-    if (hasFe) return { reactants: 'Fe + S', products: 'FeS' };
-    if (hasCu) return { reactants: 'Cu + S', products: 'CuS' };
-    if (hasH) return { reactants: 'H2 + S', products: 'H2S' };
-    if (hasZn) return { reactants: 'Zn + S', products: 'ZnS' };
-  }
+      // Elements + Sulfur
+      'Fe+S': ['FeS'],
+      'Cu+S': ['CuS'],
+      'Na+S': ['Na2S'],
+      'H2+S': ['H2S'],
+      'S+Zn': ['ZnS'],
 
-  if (cleanSide.includes('h') && cleanSide.includes('o')) {
-    return { reactants: 'H2 + O2', products: 'H2O' };
+      // Acid + Base
+      'HCl+NaOH': ['NaCl', 'H2O'],
+      'HCl+KOH': ['KCl', 'H2O'],
+      'Ca(OH)2+HCl': ['CaCl2', 'H2O'],
+      'H2SO4+NaOH': ['Na2SO4', 'H2O'],
+      'H2SO4+KOH': ['K2SO4', 'H2O'],
+      'Ca(OH)2+H2SO4': ['CaSO4', 'H2O'],
+
+      // Metal + Acid
+      'HCl+Zn': ['ZnCl2', 'H2'],
+      'Fe+HCl': ['FeCl2', 'H2'],
+      'HCl+Mg': ['MgCl2', 'H2'],
+      'Al+HCl': ['AlCl3', 'H2'],
+      'H2SO4+Zn': ['ZnSO4', 'H2'],
+      'Fe+H2SO4': ['FeSO4', 'H2'],
+      'H2SO4+Mg': ['MgSO4', 'H2'],
+      'Al+H2SO4': ['Al2(SO4)3', 'H2'],
+
+      // Metal + Water
+      'H2O+Na': ['NaOH', 'H2'],
+      'H2O+K': ['KOH', 'H2'],
+      'Ca+H2O': ['Ca(OH)2', 'H2'],
+
+      // Acidic Oxide + Water
+      'CO2+H2O': ['H2CO3'],
+      'H2O+SO2': ['H2SO3'],
+      'H2O+SO3': ['H2SO4'],
+      'H2O+P2O5': ['H3PO4'],
+
+      // Basic Oxide + Water
+      'H2O+Na2O': ['NaOH'],
+      'H2O+K2O': ['KOH'],
+      'CaO+H2O': ['Ca(OH)2'],
+
+      // Acidic Oxide + Base
+      'CO2+NaOH': ['Na2CO3', 'H2O'],
+      'CO2+KOH': ['K2CO3', 'H2O'],
+      'CO2+Ca(OH)2': ['CaCO3', 'H2O'],
+
+      // Acidic Oxide + Basic Oxide
+      'CaO+CO2': ['CaCO3'],
+      'CO2+Na2O': ['Na2CO3'],
+      'CaO+SO2': ['CaSO3'],
+
+      // Acid + Carbonate
+      'CaCO3+HCl': ['CaCl2', 'H2O', 'CO2'],
+      'HCl+Na2CO3': ['NaCl', 'H2O', 'CO2'],
+      'CaCO3+H2SO4': ['CaSO4', 'H2O', 'CO2'],
+      'H2SO4+Na2CO3': ['Na2SO4', 'H2O', 'CO2'],
+    };
+
+    const prod = reactionMap[pair];
+    if (prod) {
+      return {
+        reactants: reactants.join(' + '),
+        products: prod.join(' + ')
+      };
+    }
   }
 
   return null;
@@ -182,7 +287,7 @@ export default function EquationCompleter({ currentLang }: EquationCompleterProp
     const emptyRhs = !hasDivider || parts.length < 2 || parts[1].trim() === '';
     
     if (emptyRhs) {
-      const lhs = parts[0].trim();
+      const lhs = parts[0].trim().replace(/[=➔\->]+$/, '').trim();
       const predicted = predictProducts(lhs);
       if (predicted) {
         currentEquation = `${predicted.reactants} = ${predicted.products}`;
@@ -364,16 +469,6 @@ export default function EquationCompleter({ currentLang }: EquationCompleterProp
                 setEquationStr(val);
                 setBalancedEquation(null);
                 setStatusMsg({ type: 'neutral', text: '' });
-
-                // Detect if the string ends with =, -> or ➔
-                const trimmed = val.trim();
-                if (trimmed.endsWith('=') || trimmed.endsWith('->') || trimmed.endsWith('➔')) {
-                  const reactantsSide = trimmed.replace(/[=➔\->]+$/, '');
-                  const predicted = predictProducts(reactantsSide);
-                  if (predicted) {
-                    setEquationStr(`${predicted.reactants} = ${predicted.products}`);
-                  }
-                }
               }}
               placeholder={t.equationPlaceholder}
             />
