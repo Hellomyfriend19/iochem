@@ -1,0 +1,6 @@
+{
+  "name": "Iochem",
+  "description": "Apple-style interactive chemistry playground, periodic table, and informational resource.",
+  "requestFramePermissions": ["camera", "microphone", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
