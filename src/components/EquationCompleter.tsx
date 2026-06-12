@@ -4,6 +4,7 @@ import { Sparkles, Trash2, HelpCircle, CheckCircle, AlertOctagon } from 'lucide-
 import { Language } from '../types';
 import { translations } from '../data/translationData';
 import { checkValencyFormula } from '../data/chemistryData';
+import { balanceChemicalEquation } from '../utils/chemistrySolver';
 
 interface EquationCompleterProps {
   currentLang: Language;
@@ -208,6 +209,28 @@ function predictProducts(leftSide: string): { reactants: string; products: strin
         products: prod.join(' + ')
       };
     }
+
+    // Generic organic/combustion synthesis procedural rule
+    if (reactants.includes('O2')) {
+      const other = reactants.find(r => r !== 'O2');
+      if (other && other.includes('C')) {
+        const hasH = other.includes('H');
+        const hasS = other.includes('S');
+        const hasN = other.includes('N');
+        const hasP = other.includes('P');
+        
+        const combustionProducts: string[] = ['CO2'];
+        if (hasH) combustionProducts.push('H2O');
+        if (hasS) combustionProducts.push('SO2');
+        if (hasN) combustionProducts.push('N2');
+        if (hasP) combustionProducts.push('P2O5');
+
+        return {
+          reactants: reactants.join(' + '),
+          products: combustionProducts.join(' + ')
+        };
+      }
+    }
   }
 
   return null;
@@ -343,67 +366,11 @@ export default function EquationCompleter({ currentLang }: EquationCompleterProp
         throw new Error('Elements missing on reactants or products sides');
       }
 
-      // Gather unified unique atomic symbols (e.g. ["H", "O"])
-      const allAtomsSet = new Set<string>();
-      reactants.forEach(m => Object.keys(m.atoms).forEach(a => allAtomsSet.add(a)));
-      products.forEach(m => Object.keys(m.atoms).forEach(a => allAtomsSet.add(a)));
-      const allAtoms = Array.from(allAtomsSet);
-
-      // Search matching coefficients from 1 up to 16
-      // Since chemicals equations are small, searching coefficient arrays iteratively is incredibly performant and 100% precise.
-      let solvedCoefficients: { rCoeffs: number[]; pCoeffs: number[] } | null = null;
-
-      // Reactants size array bounds, Products size array bounds
-      const rSize = reactants.length;
-      const pSize = products.length;
-
-      // We support up to 3 reactants and 3 products (covering all typical high-school and college chemistry reactions!)
-      const rMax = Math.pow(15, rSize);
-      const pMax = Math.pow(15, pSize);
-
-      outerLoop:
-      for (let rVal = 1; rVal < rMax; rVal++) {
-        // extract coefficients base 15
-        const rCoeffs: number[] = [];
-        let tempR = rVal;
-        for (let i = 0; i < rSize; i++) {
-          rCoeffs.push((tempR % 15) + 1);
-          tempR = Math.floor(tempR / 15);
-        }
-
-        for (let pVal = 1; pVal < pMax; pVal++) {
-          const pCoeffs: number[] = [];
-          let tempP = pVal;
-          for (let i = 0; i < pSize; i++) {
-            pCoeffs.push((tempP % 15) + 1);
-            tempP = Math.floor(tempP / 15);
-          }
-
-          // Verify conservation balance matches exactly
-          let match = true;
-          for (let atom of allAtoms) {
-            let leftCount = 0;
-            reactants.forEach((m, idx) => {
-              leftCount += (m.atoms[atom] || 0) * rCoeffs[idx];
-            });
-
-            let rightCount = 0;
-            products.forEach((m, idx) => {
-              rightCount += (m.atoms[atom] || 0) * pCoeffs[idx];
-            });
-
-            if (leftCount !== rightCount) {
-              match = false;
-              break;
-            }
-          }
-
-          if (match) {
-            solvedCoefficients = { rCoeffs, pCoeffs };
-            break outerLoop;
-          }
-        }
-      }
+      // Search matching coefficients from 1 up to bounds
+      let solvedCoefficients = balanceChemicalEquation(
+        reactants.map(r => r.atoms),
+        products.map(p => p.atoms)
+      );
 
       if (solvedCoefficients) {
         // Format with balanced numbers coefficient prefix!

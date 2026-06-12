@@ -50,10 +50,13 @@ export default function App() {
           {/* Logo Brand Title */}
           {!isPortrait && (
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-[#1D1D1F] flex items-center justify-center text-white font-bold text-base shadow-xs">
-                I
-              </div>
-              <span className="font-display font-semibold text-lg tracking-tight text-[#1D1D1F]">
+              <img 
+                src="https://github.com/Hellomyfriend19/iochem/blob/main/New%20Project-5.png?raw=true" 
+                alt="Iochem Logo"
+                className="w-8 h-8 rounded-lg object-cover shadow-xs"
+                referrerPolicy="no-referrer"
+              />
+              <span className="font-bebas text-2xl tracking-wider text-[#1D1D1F] mt-1">
                 Iochem
               </span>
             </div>
@@ -66,10 +69,17 @@ export default function App() {
               onClick={() => setActiveSection('library')}
               className={`relative px-4 py-1.5 text-xs font-semibold rounded-full transition-all duration-300 cursor-pointer ${
                 activeSection === 'library'
-                  ? 'bg-white shadow-xs text-[#0071E3]'
+                  ? 'text-[#0071E3]'
                   : 'text-[#424245] hover:text-[#1D1D1F]'
               }`}
             >
+              {activeSection === 'library' && (
+                <motion.div
+                  layoutId="activeNavTab"
+                  className="absolute inset-0 bg-white rounded-full shadow-xs z-0"
+                  transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+                />
+              )}
               <span className="relative z-10 flex items-center gap-1.5">
                 <Library size={13} />
                 {t.sectionInformational}
@@ -81,10 +91,17 @@ export default function App() {
               onClick={() => setActiveSection('playground')}
               className={`relative px-4 py-1.5 text-xs font-semibold rounded-full transition-all duration-300 cursor-pointer ${
                 activeSection === 'playground'
-                  ? 'bg-white shadow-xs text-[#0071E3]'
+                  ? 'text-[#0071E3]'
                   : 'text-[#424245] hover:text-[#1D1D1F]'
               }`}
             >
+              {activeSection === 'playground' && (
+                <motion.div
+                  layoutId="activeNavTab"
+                  className="absolute inset-0 bg-white rounded-full shadow-xs z-0"
+                  transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+                />
+              )}
               <span className="relative z-10 flex items-center gap-1.5">
                 <PlayCircle size={13} />
                 {t.sectionPlayground}
@@ -138,7 +155,7 @@ export default function App() {
                   {currentLang === 'ka' ? 'ინსტრუმენტები' : currentLang === 'ru' ? 'Инструменты' : 'Playground Tools'}
                 </div>
                 
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 relative">
                   {playgroundSubTabs.map((pTab) => {
                     const isActive = activePlaygroundTab === pTab.id;
                     return (
@@ -146,18 +163,25 @@ export default function App() {
                         key={pTab.id}
                         id={`sidebar-subtab-btn-${pTab.id}`}
                         onClick={() => setActivePlaygroundTab(pTab.id as any)}
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold w-full text-left transition-all duration-200 cursor-pointer ${
+                        className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold w-full text-left transition-all duration-200 cursor-pointer ${
                           isActive
-                            ? 'bg-[#F2F8FF] text-[#0071E3] shadow-xs font-bold'
+                            ? 'text-[#0071E3] font-bold'
                             : 'text-[#424245] hover:bg-[#F5F5F7] hover:text-[#1D1D1F]'
                         }`}
                       >
+                        {isActive && (
+                          <motion.div
+                            layoutId="activeSubTabDesktop"
+                            className="absolute inset-0 bg-[#F2F8FF] rounded-xl shadow-xs z-0"
+                            transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+                          />
+                        )}
                         <div
-                          className={`w-1.5 h-1.5 rounded-full transition-all ${
+                          className={`relative z-10 w-1.5 h-1.5 rounded-full transition-all ${
                             isActive ? 'bg-[#0071E3] scale-125' : 'border border-[#424245]'
                           }`}
                         />
-                        <span>{pTab.label[currentLang]}</span>
+                        <span className="relative z-10">{pTab.label[currentLang]}</span>
                       </button>
                     );
                   })}
@@ -196,13 +220,20 @@ export default function App() {
                         key={pTab.id}
                         id={`playground-subtab-btn-${pTab.id}`}
                         onClick={() => setActivePlaygroundTab(pTab.id as any)}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition-all duration-200 whitespace-nowrap cursor-pointer ${
+                        className={`relative px-3 py-1.5 text-xs font-semibold rounded-xl transition-all duration-200 whitespace-nowrap cursor-pointer ${
                           activePlaygroundTab === pTab.id
-                            ? 'bg-white text-[#0071E3] shadow-xs font-bold'
+                            ? 'text-[#0071E3] font-bold'
                             : 'text-[#86868B] hover:text-[#1D1D1F]'
                         }`}
                       >
-                        {pTab.label[currentLang]}
+                        {activePlaygroundTab === pTab.id && (
+                          <motion.div
+                            layoutId="activeSubTabMobile"
+                            className="absolute inset-0 bg-white rounded-xl shadow-xs z-0"
+                            transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+                          />
+                        )}
+                        <span className="relative z-10">{pTab.label[currentLang]}</span>
                       </button>
                     ))}
                   </div>

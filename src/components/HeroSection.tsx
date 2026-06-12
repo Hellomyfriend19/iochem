@@ -27,7 +27,7 @@ export default function HeroSection({ currentLang }: HeroSectionProps) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -15 }}
                 transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                className="text-5xl md:text-6xl font-display font-semibold text-gray-900 tracking-tight"
+                className="text-6xl md:text-7xl font-bebas tracking-wide text-gray-900 mt-2"
               >
                 {t.brand}
               </motion.h1>

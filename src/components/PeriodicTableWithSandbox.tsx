@@ -321,9 +321,20 @@ const findProceduralReaction = (s1: string, s2: string) => {
       }
 
       if (other.isOrganic) {
+        const hasH = other.raw.includes('H');
+        const hasS = other.raw.includes('S');
+        const hasN = other.raw.includes('N');
+        const hasP = other.raw.includes('P');
+        
+        const combustionProducts: string[] = ['CO2'];
+        if (hasH) combustionProducts.push('H2O');
+        if (hasS) combustionProducts.push('SO2');
+        if (hasN) combustionProducts.push('N2');
+        if (hasP) combustionProducts.push('P2O5');
+
         return buildReactionResponse(
-          ['CO2', 'H2O'],
-          textEnglish(a.raw, b.raw, ['CO2', 'H2O'], 'Hydrocarbon Combustion')
+          combustionProducts,
+          textEnglish(a.raw, b.raw, combustionProducts, 'Hydrocarbon Combustion')
         );
       }
     }
@@ -1055,7 +1066,7 @@ export default function PeriodicTableWithSandbox({ currentLang }: PeriodicTableW
           <div
             ref={sandboxRef}
             id="physics-sandbox-container"
-            className="relative w-full h-[360px] bg-[#F5F5F7] rounded-3xl border border-[#E5E5EA] shadow-inner overflow-hidden select-none flex items-center justify-center pt-8"
+            className="relative w-full h-[460px] bg-[#F5F5F7] rounded-3xl border border-[#E5E5EA] shadow-inner overflow-hidden select-none flex items-center justify-center pt-8"
           >
             {tiles.length === 0 && (
               <motion.div
@@ -1136,52 +1147,52 @@ export default function PeriodicTableWithSandbox({ currentLang }: PeriodicTableW
                 </motion.div>
               </div>
             ))}
+
+            {/* Suggestions Bottom bar popup when an element is active (now contained with absolute position to prevent page layout jumps) */}
+            <AnimatePresence>
+              {selectedTileId && (() => {
+                const activeTile = tiles.find(t => t.id === selectedTileId);
+                if (!activeTile) return null;
+                const suggestions = getSuggestionsForTile(activeTile.symbol);
+
+                return (
+                  <motion.div
+                    id="sandbox-suggestions-panel"
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 15 }}
+                    className="absolute bottom-4 left-4 right-4 z-40 p-4 rounded-2xl bg-white/95 backdrop-blur-md border border-[#E5E5EA] shadow-lg flex flex-col gap-3"
+                  >
+                    <div className="flex items-center gap-1.5 text-xs text-[#86868B] font-semibold uppercase tracking-wider">
+                      <RefreshCw size={13} className="text-[#0071E3] animate-spin-[linear_3s_infinite]" />
+                      <span>{t.reactionPartners} ➜ {activeTile.symbol} :</span>
+                    </div>
+                    
+                    {suggestions.length === 0 ? (
+                      <div className="text-xs text-[#86868B] italic">
+                        No immediate known reaction triggers cataloged in basic database scope. Try combining K, Na, Ca, Fe, Al, Cu, Zn with O2, H2O, HCl, or NaOH.
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2 max-h-[80px] overflow-y-auto no-scrollbar pb-1">
+                        {suggestions.map((pSymbol) => {
+                          return (
+                            <button
+                              key={pSymbol}
+                              id={`react-suggestion-btn-${pSymbol.toLowerCase()}`}
+                              onClick={() => triggerReaction(activeTile.symbol, pSymbol)}
+                              className="px-3.5 py-2 inline-flex items-center gap-1 rounded-xl bg-[#F5F5F7] border border-[#E5E5EA] text-xs text-gray-700 font-bold font-mono hover:bg-[#0071E3] hover:text-white hover:border-[#0071E3] hover:shadow-xs scale-1 active:scale-95 transition-all duration-200 cursor-pointer"
+                            >
+                              + {pSymbol}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              })()}
+            </AnimatePresence>
           </div>
-
-          {/* Suggestions Bottom bar popup when an element is active */}
-          <AnimatePresence>
-            {selectedTileId && (() => {
-              const activeTile = tiles.find(t => t.id === selectedTileId);
-              if (!activeTile) return null;
-              const suggestions = getSuggestionsForTile(activeTile.symbol);
-
-              return (
-                <motion.div
-                  id="sandbox-suggestions-panel"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="p-4 rounded-2xl bg-white border border-[#E5E5EA] shadow-xs flex flex-col gap-3"
-                >
-                  <div className="flex items-center gap-1.5 text-xs text-[#86868B] font-semibold uppercase tracking-wider">
-                    <RefreshCw size={13} className="text-[#0071E3] animate-spin-[linear_3s_infinite]" />
-                    <span>{t.reactionPartners} ➜ {activeTile.symbol} :</span>
-                  </div>
-                  
-                  {suggestions.length === 0 ? (
-                    <div className="text-xs text-[#86868B] italic">
-                      No immediate known reaction triggers cataloged in basic database scope. Try combining K, Na, Ca, Fe, Al, Cu, Zn with O2, H2O, HCl, or NaOH.
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {suggestions.map((pSymbol) => {
-                        return (
-                          <button
-                            key={pSymbol}
-                            id={`react-suggestion-btn-${pSymbol.toLowerCase()}`}
-                            onClick={() => triggerReaction(activeTile.symbol, pSymbol)}
-                            className="px-3.5 py-2 inline-flex items-center gap-1 rounded-xl bg-[#F5F5F7] border border-[#E5E5EA] text-xs text-gray-700 font-bold font-mono hover:bg-[#0071E3] hover:text-white hover:border-[#0071E3] hover:shadow-xs scale-1 active:scale-95 transition-all duration-200 cursor-pointer"
-                          >
-                            + {pSymbol}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </motion.div>
-              );
-            })()}
-          </AnimatePresence>
         </div>
       </div>
 
